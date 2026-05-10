@@ -28,21 +28,37 @@ produce a structured, evidence-based credit decision.
 
 ## Scoring framework — produce an overall_score from 0 to 100 (higher = lower risk)
 
-| Dimension           | Weight | Guidance                                                         |
-|---------------------|--------|------------------------------------------------------------------|
-| Revenue stability   |  25 %  | YoY trend; sustained growth scores high, contraction scores low  |
-| Debt serviceability |  25 %  | debt_ratio < 0.4 → strong; 0.4–0.6 → moderate; > 0.6 → weak     |
-| Payment history     |  25 %  | payment_history_score 750+ → excellent; 600–749 → fair; < 600 → poor |
-| Industry risk       |  15 %  | Assess volatility of the sector; retail/F&B score lower than tech |
-| Liquidity           |  10 %  | bank_balance vs. monthly obligations; runway matters              |
+| Dimension           | Weight | Guidance                                                                        |
+|---------------------|--------|---------------------------------------------------------------------------------|
+| Revenue stability   |  25 %  | YoY trend; sustained growth scores high, contraction scores low                 |
+| Debt serviceability |  25 %  | debt_ratio < 0.4 → strong; 0.4–0.6 → moderate; > 0.6 → weak                   |
+| Payment history     |  25 %  | payment_history_score 75+ → excellent; 50–74 → fair; < 50 → poor               |
+| Industry risk       |  15 %  | Assess volatility of the sector; retail/F&B score lower than tech               |
+| Liquidity           |  10 %  | bank_balance vs. monthly obligations; runway matters                            |
+
+Score each dimension independently, apply weights, and sum. Do not round up to avoid
+a hard threshold — if the evidence is weak, the score must reflect that.
+
+### Automatic score caps
+
+The following conditions impose a hard ceiling on overall_score regardless of other factors:
+
+- annual_revenue < $100,000 → overall_score ≤ 40
+- years_trading ≤ 1 → overall_score ≤ 42
+- net_profit < 0 (revenue_trend deeply negative or explicit loss indicator) → overall_score ≤ 38
+- credit_utilisation > 80 % → overall_score ≤ 44
+- Two or more of the above conditions present simultaneously → overall_score ≤ 35
+
+These caps are non-negotiable. A company that triggers even one of them cannot score above 44
+and therefore cannot be approved.
 
 ## Credit limit — set credit_limit_recommended between $10,000 and $500,000 USD
 
-| Score band | Max credit limit  |
-|------------|-------------------|
-| 80 – 100   | $500,000          |
-| 60 –  79   | $250,000          |
-| 40 –  59   | $100,000          |
+| Score band | Max credit limit            |
+|------------|-----------------------------|
+| 80 – 100   | $500,000                    |
+| 60 –  79   | $250,000                    |
+| 40 –  59   | $100,000                    |
 |  0 –  39   | $50,000 (or $0 if declined) |
 
 ## Risk rating thresholds
@@ -56,7 +72,7 @@ produce a structured, evidence-based credit decision.
 
 ## Decision rules
 
-- **approved**: overall_score ≥ 60 and no critical flags
+- **approved**: overall_score ≥ 60 AND no critical flags
 - **conditional**: overall_score 40–59, OR score ≥ 60 with notable flags (e.g. overdue invoices,
   high credit utilisation)
 - **declined**: overall_score < 40, OR critical flags present (defaults in last 5 years,
@@ -66,9 +82,11 @@ When declining, set credit_limit_recommended to 0 and risk_rating to "declined".
 
 ## Flags
 
-Populate the flags list with short, factual strings describing material risk factors found
-in the data (e.g. "3 defaults in last 5 years", "debt ratio 0.72 — above threshold",
-"revenue declining 8 % YoY"). Leave the list empty if no significant flags are found.
+Populate the flags list with short, factual strings for every material risk factor, including
+any automatic cap that was applied (e.g. "revenue $95k — below $100k threshold",
+"1 year trading — below minimum track record", "negative net profit",
+"credit utilisation 85 % — above 80 % threshold").
+Leave the list empty only if no significant factors are present.
 
 ## reasoning
 

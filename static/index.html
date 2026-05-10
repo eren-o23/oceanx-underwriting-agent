@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OceanX AI — Underwriting Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0f1e;
+      --card:      #111827;
+      --card-hi:   #1a2436;
+      --border:    #1f2d40;
+      --accent:    #0a3d62;
+      --accent-hi: #0d4f7c;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --mono:      'Courier New', monospace;
+      --green:     #10b981;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --radius:    10px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 32px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .brand {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    header .version {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 0;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 24px;
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    input, select {
+      width: 100%;
+      background: var(--card-hi);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus { border-color: var(--accent-hi); }
+    select option { background: var(--card); }
+
+    button {
+      flex: 1;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+    }
+
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--accent-hi);
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: #0f5a8a; }
+
+    .btn-secondary {
+      background: var(--card-hi);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: #1f2d40; }
+
+    /* ── Results panel ── */
+    .results-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .results-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 240px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* ── Decision badge ── */
+    .decision-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .badge-approved  { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+    .badge-conditional { background: rgba(245,158,11,.15); color: var(--amber); border: 1px solid rgba(245,158,11,.3); }
+    .badge-declined  { background: rgba(239,68,68,.15);   color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+
+    /* ── Score bar ── */
+    .score-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .score-bar-track {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.8s cubic-bezier(.4,0,.2,1);
+    }
+
+    .score-value {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 48px;
+      text-align: right;
+    }
+
+    /* ── Dimension table ── */
+    .dim-table { width: 100%; border-collapse: collapse; }
+    .dim-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      padding: 0 0 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .dim-table td {
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    .dim-table tr:last-child td { border-bottom: none; }
+    .dim-table .col-label { color: var(--muted); width: 38%; }
+    .dim-table .col-value { font-family: var(--mono); color: var(--text); width: 22%; }
+    .dim-table .col-bar   { width: 40%; }
+
+    /* ── Human review banner ── */
+    .human-banner {
+      background: rgba(245,158,11,.08);
+      border: 1px solid rgba(245,158,11,.3);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+
+    .human-banner-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--amber);
+      margin-bottom: 6px;
+    }
+
+    .human-banner-body {
+      font-size: 12px;
+      color: rgba(245,158,11,.75);
+      line-height: 1.5;
+    }
+
+    /* ── Flags ── */
+    .flags-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .flag-badge {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.25);
+      color: #f87171;
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 12px;
+    }
+
+    /* ── Activity feed ── */
+    .feed { display: flex; flex-direction: column; gap: 6px; }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .feed-item.visible { opacity: 1; transform: translateY(0); }
+
+    .feed-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-hi);
+      flex-shrink: 0;
+    }
+
+    .feed-dot.done { background: var(--green); }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Helpers ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .reasoning-text {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.7;
+    }
+
+    .credit-limit-val {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.35s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <span class="brand">OceanX AI</span>
+    <span class="version">Underwriting Agent v1.0</span>
+  </header>
+
+  <main>
+
+    <!-- ── Left: form ── -->
+    <div>
+      <div class="card">
+        <div class="card-title">Credit Application</div>
+
+        <div class="field">
+          <label for="company">Company Name</label>
+          <input id="company" type="text" placeholder="Pacific Rim Trading Ltd" />
+        </div>
+
+        <div class="field">
+          <label for="revenue">Annual Revenue (USD)</label>
+          <input id="revenue" type="number" min="1" placeholder="2400000" />
+        </div>
+
+        <div class="field">
+          <label for="industry">Industry</label>
+          <select id="industry">
+            <option>Food Import</option>
+            <option>Electronics</option>
+            <option>General Trade</option>
+            <option>Retail</option>
+            <option>Logistics</option>
+            <option>SaaS / Tech</option>
+            <option>Agriculture</option>
+            <option>Hospitality</option>
+            <option>Health &amp; Pharma</option>
+            <option>Fashion</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="years">Years Trading</label>
+          <input id="years" type="number" min="0" placeholder="5" />
+        </div>
+
+        <div class="field">
+          <label for="country">Country</label>
+          <select id="country">
+            <option>New Zealand</option>
+            <option>Australia</option>
+            <option>United States</option>
+            <option>United Kingdom</option>
+            <option>Singapore</option>
+            <option>Canada</option>
+            <option>Germany</option>
+            <option>Japan</option>
+          </select>
+        </div>
+
+        <button class="btn-primary" id="btn-assess" onclick="runAssess()" style="width:100%;margin-top:24px;">Assess</button>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:18px 0 10px;">
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;">or try preset profiles</span>
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+        </div>
+
+        <button class="btn-secondary" id="btn-demo" onclick="runDemo()" style="width:100%;">Run Demo</button>
+      </div>
+    </div>
+
+    <!-- ── Right: results ── -->
+    <div class="results-panel" id="results-panel">
+      <div class="card">
+        <div class="results-empty" id="results-empty">
+          Submit an application or run the demo to see results.
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const API = '';  // same origin
+
+  let _demoStep = 0;
+
+  function setLoading(on) {
+    const btnAssess = document.getElementById('btn-assess');
+    const btnDemo   = document.getElementById('btn-demo');
+    btnAssess.disabled = on;
+    btnDemo.disabled   = on;
+    btnAssess.innerHTML = on
+      ? '<span class="spinner"></span>'
+      : 'Assess';
+  }
+
+  async function runAssess() {
+    const company = document.getElementById('company').value.trim();
+    if (!company) { alert('Please enter a company name.'); return; }
+
+    setLoading(true);
+    showFeed();
+
+    try {
+      const resp = await fetch(`${API}/underwrite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: company,
+          revenue:   parseFloat(document.getElementById('revenue').value) || 1_000_000,
+          industry:  document.getElementById('industry').value,
+          years:     parseInt(document.getElementById('years').value, 10) || 5,
+          country:   document.getElementById('country').value,
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || resp.statusText);
+      }
+      const data = await resp.json();
+      renderResults(data);
+    } catch (e) {
+      renderError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runDemo() {
+    setLoading(true);
+    showFeed();
+
+    try {
+      const resp = await fetch(`${API}/demo`);
+      if (!resp.ok) throw new Error(resp.statusText);
+      const data = await resp.json();
+      document.getElementById('company').value  = data.company_name;
+      document.getElementById('revenue').value  = data.annual_revenue;
+      document.getElementById('years').value    = data.years_trading;
+      setSelectByValue('industry', data.industry);
+      setSelectByValue('country', data.country);
+      renderResults(data);
+      _demoStep = (_demoStep + 1) % 3;
+    } catch (e) {
+      renderError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function setSelectByValue(id, value) {
+    const sel = document.getElementById(id);
+    for (const opt of sel.options) {
+      if (opt.value === value || opt.text === value) { sel.value = opt.value; return; }
+    }
+  }
+
+  // ── Activity feed shown while loading ──
+  const FEED_STEPS = [
+    'Fetching company enrichment (Apollo)…',
+    'Pulling financial statements (Xero)…',
+    'Retrieving credit bureau report…',
+    'Running AI credit analysis…',
+    'Generating underwriting decision…',
+  ];
+
+  let _feedTimer = null;
+
+  function showFeed() {
+    clearTimeout(_feedTimer);
+    const panel = document.getElementById('results-panel');
+    panel.innerHTML = `
+      <div class="card fade-in">
+        <div class="card-title">Processing</div>
+        <div class="feed" id="feed"></div>
+      </div>`;
+
+    FEED_STEPS.forEach((text, i) => {
+      _feedTimer = setTimeout(() => {
+        const feed = document.getElementById('feed');
+        if (!feed) return;
+        const item = document.createElement('div');
+        item.className = 'feed-item';
+        item.innerHTML = `<div class="feed-dot"></div><span>${text}</span>`;
+        feed.appendChild(item);
+        requestAnimationFrame(() => item.classList.add('visible'));
+        if (i > 0) {
+          const prev = feed.children[i - 1];
+          if (prev) prev.querySelector('.feed-dot').classList.add('done');
+        }
+      }, i * 500);
+    });
+  }
+
+  // ── Render helpers ──
+  function scoreColor(s) {
+    if (s >= 70) return 'var(--green)';
+    if (s >= 45) return 'var(--amber)';
+    return 'var(--red)';
+  }
+
+  function miniBar(score, color) {
+    return `
+      <div class="score-bar-wrap">
+        <div class="score-bar-track">
+          <div class="score-bar-fill" style="width:0%;background:${color}" data-target="${score}"></div>
+        </div>
+        <div class="score-value" style="color:${color}">${score}</div>
+      </div>`;
+  }
+
+  function revenueScore(trend) { return Math.max(0, Math.min(100, Math.round(50 + trend * 100))); }
+  function debtScore(ratio)    { return Math.max(0, Math.min(100, Math.round((1 - ratio) * 100))); }
+  function industryScore(ind)  {
+    const l = ind.toLowerCase();
+    const high = ['retail','hospitality','food','beverage','agriculture','gaming','fashion'];
+    const low  = ['tech','software','saas','fintech','health','logistics'];
+    if (high.some(k => l.includes(k))) return 30;
+    if (low.some(k => l.includes(k)))  return 80;
+    return 55;
+  }
+
+  function badgeClass(decision) {
+    return { approved: 'badge-approved', conditional: 'badge-conditional', declined: 'badge-declined' }[decision] || '';
+  }
+
+  function decisionLabel(decision) {
+    return { approved: '✓  APPROVED', conditional: '~  REFER', declined: '✗  DECLINED' }[decision] || decision;
+  }
+
+  function fmtUSD(n) {
+    if (n === 0) return '$0';
+    return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+
+  function renderResults(d) {
+    clearTimeout(_feedTimer);
+    const overallColor = scoreColor(d.overall_score);
+
+    const humanBanner = d.requires_human_review ? `
+      <div class="human-banner fade-in">
+        <div class="human-banner-title">⚠  Human Review Required</div>
+        <div class="human-banner-body">
+          ${d.overall_score < 45 ? `Low overall score: ${d.overall_score} / 100 (threshold: 45)<br>` : ''}
+          ${d.credit_limit_recommended > 250_000 ? `High credit limit recommended: ${fmtUSD(d.credit_limit_recommended)} (threshold: $250,000)` : ''}
+        </div>
+      </div>` : '';
+
+    const flagsHtml = d.flags.length
+      ? `<div class="card fade-in">
+           <div class="section-label">Risk Flags</div>
+           <div class="flags-wrap">
+             ${d.flags.map(f => `<span class="flag-badge">${f}</span>`).join('')}
+           </div>
+         </div>`
+      : '';
+
+    const revScore  = revenueScore(d.revenue_trend);
+    const debtSc    = debtScore(d.debt_ratio);
+    const indSc     = industryScore(d.industry);
+    const pmtSc     = d.payment_history_score;
+    const sign      = d.revenue_trend >= 0 ? '+' : '';
+    const revTrendFmt = `${sign}${(d.revenue_trend * 100).toFixed(1)}% YoY`;
+    const debtFmt   = d.debt_ratio.toFixed(2) + ' ratio';
+
+    const dims = [
+      ['Revenue Stability',   revTrendFmt, revScore],
+      ['Debt Serviceability', debtFmt,     debtSc],
+      ['Payment History',     `${pmtSc} / 100`, pmtSc],
+      ['Industry Risk',       d.industry,  indSc],
+    ];
+
+    const dimsHtml = dims.map(([label, val, sc]) => `
+      <tr>
+        <td class="col-label">${label}</td>
+        <td class="col-value">${val}</td>
+        <td class="col-bar">${miniBar(sc, scoreColor(sc))}</td>
+      </tr>`).join('');
+
+    const panel = document.getElementById('results-panel');
+    panel.innerHTML = `
+      ${humanBanner}
+
+      <div class="card fade-in">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div>
+            <div style="font-size:17px;font-weight:700;margin-bottom:4px;">${esc(d.company_name)}</div>
+            <div style="font-size:12px;color:var(--muted)">${esc(d.industry)} · ${esc(d.country)} · ${fmtUSD(d.annual_revenue)} revenue · ${d.years_trading} yr${d.years_trading !== 1 ? 's' : ''} trading</div>
+          </div>
+          <div class="decision-badge ${badgeClass(d.decision)}">${decisionLabel(d.decision)}</div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <div class="section-label">Recommended Credit Limit</div>
+          <div class="credit-limit-val" style="color:${d.credit_limit_recommended > 0 ? overallColor : 'var(--red)'}">
+            ${d.credit_limit_recommended > 0 ? fmtUSD(d.credit_limit_recommended) : '$0 — declined'}
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label" style="margin-bottom:8px;">Overall Score</div>
+          ${miniBar(d.overall_score, overallColor)}
+        </div>
+      </div>
+
+      <div class="card fade-in">
+        <div class="card-title">Risk Dimensions</div>
+        <table class="dim-table">
+          <thead>
+            <tr>
+              <th>Dimension</th>
+              <th>Value</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>${dimsHtml}</tbody>
+        </table>
+      </div>
+
+      ${flagsHtml}
+
+      <div class="card fade-in">
+        <div class="section-label">Analyst Reasoning</div>
+        <div class="reasoning-text">${esc(d.reasoning)}</div>
+      </div>
+    `;
+
+    // Animate bars after DOM paint
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.score-bar-fill[data-target]').forEach(el => {
+        const target = el.getAttribute('data-target');
+        el.style.width = target + '%';
+      });
+    });
+  }
+
+  function renderError(msg) {
+    clearTimeout(_feedTimer);
+    const panel = document.getElementById('results-panel');
+    panel.innerHTML = `
+      <div class="card fade-in">
+        <div style="color:var(--red);font-weight:600;margin-bottom:8px;">Error</div>
+        <div style="color:var(--muted);font-size:13px;">${esc(msg)}</div>
+      </div>`;
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
