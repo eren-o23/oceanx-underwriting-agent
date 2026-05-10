@@ -2,7 +2,7 @@
 
 ## What This Does
 
-This is an AI-powered credit underwriting agent built for OceanX AI, a trade finance company that provides working capital to SMEs engaged in cross-border trade. When a business applies for a credit facility, the agent pulls financial and company data from three external sources in parallel, passes the full picture to GPT-4o with a structured scoring framework, and returns a credit decision — approved, conditional, or declined — along with a recommended credit limit, a risk rating, and a written analyst rationale. The entire assessment takes a few seconds rather than hours.
+This is an AI-powered credit underwriting agent built for OceanX AI, a trade finance company that provides working capital to SMEs engaged in cross-border trade. When a business applies for a credit facility, the agent pulls financial and company data from three external sources in parallel, passes the full picture to GPT-4o with a structured scoring framework, and returns a credit decision — Approved, Refer, or Declined — along with a recommended credit limit, a risk rating, and a written analyst rationale. The entire assessment takes a few seconds rather than hours.
 
 The system is designed around the principle that AI should automate everything it can do reliably, while humans retain control at the points where judgement or accountability matter most. A human checkpoint fires automatically when the overall risk score falls below 45 or the recommended credit limit exceeds $250,000 — flagging the application for manual review before any commitment is made. This mirrors OceanX's broader operating model: agents handle the analytical heavy lifting, humans make the capital decisions.
 
@@ -58,7 +58,7 @@ python main.py --company "Apex Distribution Co" --revenue 380000 --industry Elec
 | Industry Risk | Application (`industry`) | 15% | Retail / F&B / agriculture → higher risk; tech / SaaS / health → lower risk |
 | Liquidity | Xero (`bank_balance_usd`) | 10% | Bank balance relative to monthly revenue obligations; runway assessed contextually |
 
-Score bands map to decisions: 80–100 → Approved up to $500k; 60–79 → Approved up to $250k; 40–59 → Conditional up to $100k; below 40 → Declined.
+Score bands map to decisions: 80–100 → Approved up to $500k; 60–79 → Approved up to $250k; 40–59 → Refer up to $100k; below 40 → Declined.
 
 ## Scaling to Full Multi-Agent System
 
