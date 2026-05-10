@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -431,6 +432,7 @@
   const API = '';  // same origin
 
   let _demoStep = 0;
+  let _lastResult = null;
 
   function setLoading(on) {
     const btnAssess = document.getElementById('btn-assess');
@@ -582,6 +584,7 @@
   }
 
   function renderResults(d) {
+    _lastResult = d;
     clearTimeout(_feedTimer);
     const overallColor = scoreColor(d.overall_score);
 
@@ -630,18 +633,21 @@
       ${humanBanner}
 
       <div class="card fade-in">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;">
           <div>
             <div style="font-size:17px;font-weight:700;margin-bottom:4px;">${esc(d.company_name)}</div>
             <div style="font-size:12px;color:var(--muted)">${esc(d.industry)} · ${esc(d.country)} · ${fmtUSD(d.annual_revenue)} revenue · ${d.years_trading} yr${d.years_trading !== 1 ? 's' : ''} trading</div>
           </div>
-          <div class="decision-badge ${badgeClass(d.decision)}">${decisionLabel(d.decision)}</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0;margin-left:16px;">
+            <div class="decision-badge ${badgeClass(d.decision)}">${decisionLabel(d.decision)}</div>
+            <button class="btn-secondary" onclick="exportPDF()" style="padding:5px 12px;font-size:11px;white-space:nowrap;width:100%;">Export PDF</button>
+          </div>
         </div>
 
         <div style="margin-bottom:20px;">
           <div class="section-label">Recommended Credit Limit</div>
           <div class="credit-limit-val" style="color:${d.credit_limit_recommended > 0 ? overallColor : 'var(--red)'}">
-            ${d.credit_limit_recommended > 0 ? fmtUSD(d.credit_limit_recommended) : '$0 — declined'}
+            ${d.credit_limit_recommended > 0 ? fmtUSD(d.credit_limit_recommended) : 'Not eligible'}
           </div>
         </div>
 
@@ -698,6 +704,285 @@
       .replace(/</g,'&lt;')
       .replace(/>/g,'&gt;')
       .replace(/"/g,'&quot;');
+  }
+
+  function exportPDF() {
+    if (!_lastResult) return;
+    const d = _lastResult;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+
+    const PW = 595.28;
+    const ML = 48;
+    const MR = 48;
+    const CW = PW - ML - MR;
+    let y = 0;
+
+    function hr(yy, rgb = [220, 228, 240], weight = 0.5) {
+      doc.setDrawColor(...rgb);
+      doc.setLineWidth(weight);
+      doc.line(ML, yy, PW - MR, yy);
+    }
+
+    function sectionHead(text, yy) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(120, 140, 165);
+      doc.setCharSpace(1.2);
+      doc.text(text, ML, yy);
+      doc.setCharSpace(0);
+      return yy + 11;
+    }
+
+    // ── Header bar ──────────────────────────────────────────────────
+    doc.setFillColor(10, 15, 30);
+    doc.rect(0, 0, PW, 56, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(226, 232, 240);
+    doc.text('OceanX AI', ML, 35);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 120, 145);
+    doc.setCharSpace(1.5);
+    doc.text('CREDIT MEMORANDUM', PW - MR, 35, { align: 'right' });
+    doc.setCharSpace(0);
+
+    // ── Date / Reference ──────────────────────────────────────────
+    y = 74;
+    const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const refStr  = 'OX-' + new Date().getFullYear() + '-' + Math.random().toString(36).toUpperCase().slice(2, 8);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 140, 165);
+    doc.text('Date: ', ML, y);
+    doc.setTextColor(30, 40, 60);
+    doc.setFont('helvetica', 'bold');
+    doc.text(dateStr, ML + 26, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120, 140, 165);
+    doc.text('Reference: ', PW - MR, y, { align: 'right' });
+    const refLabelW = doc.getTextWidth('Reference: ');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 40, 60);
+    doc.text(refStr, PW - MR - refLabelW, y);
+
+    // ── Applicant ─────────────────────────────────────────────────
+    y += 20;
+    hr(y);
+    y += 14;
+    y = sectionHead('APPLICANT', y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(d.company_name, ML, y);
+    y += 13;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    const appMeta = `${d.industry}  ·  ${d.country}  ·  ${fmtUSD(d.annual_revenue)} annual revenue  ·  ${d.years_trading} yr${d.years_trading !== 1 ? 's' : ''} trading`;
+    doc.text(appMeta, ML, y);
+    y += 18;
+
+    // ── Decision box ──────────────────────────────────────────────
+    hr(y);
+    y += 14;
+    y = sectionHead('CREDIT DECISION', y);
+
+    const DC = {
+      approved:    { bg: [240,253,244], border: [167,243,208], text: [6,95,70],   label: 'APPROVED'        },
+      conditional: { bg: [255,251,235], border: [253,230,138], text: [120,53,15], label: 'REFER FOR REVIEW' },
+      declined:    { bg: [254,242,242], border: [254,202,202], text: [153,27,27], label: 'DECLINED'         },
+    };
+    const dc = DC[d.decision];
+
+    const boxH = 50;
+    doc.setFillColor(...dc.bg);
+    doc.setDrawColor(...dc.border);
+    doc.setLineWidth(1);
+    doc.roundedRect(ML, y, CW, boxH, 3, 3, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...dc.text);
+    doc.text(dc.label, ML + 14, y + 20);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...dc.text);
+    doc.text(`Risk rating: ${d.risk_rating.toUpperCase()}`, ML + 14, y + 36);
+
+    // Credit limit (right side of box)
+    const limitStr = d.credit_limit_recommended > 0 ? fmtUSD(d.credit_limit_recommended) : 'Not eligible';
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 140, 165);
+    doc.text('Credit Limit Recommended', PW - MR - 14, y + 16, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...dc.text);
+    doc.text(limitStr, PW - MR - 14, y + 34, { align: 'right' });
+
+    y += boxH + 18;
+
+    // ── Risk Assessment ───────────────────────────────────────────
+    hr(y);
+    y += 14;
+    y = sectionHead('RISK ASSESSMENT', y);
+
+    // Table header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 140, 165);
+    doc.text('Dimension',   ML + 4,       y);
+    doc.text('Input Value', ML + 190,     y);
+    doc.text('Score',       PW - MR - 4,  y, { align: 'right' });
+    y += 5;
+    hr(y);
+    y += 9;
+
+    const revSc = Math.max(0, Math.min(100, Math.round(50 + d.revenue_trend * 100)));
+    const dbtSc = Math.max(0, Math.min(100, Math.round((1 - d.debt_ratio) * 100)));
+    const pmtSc = d.payment_history_score;
+    const indSc = industryScore(d.industry);
+    const sign  = d.revenue_trend >= 0 ? '+' : '';
+
+    const dims = [
+      ['Revenue Stability',    `${sign}${(d.revenue_trend * 100).toFixed(1)}% YoY`, revSc],
+      ['Debt Serviceability',  `${d.debt_ratio.toFixed(2)} ratio`,                   dbtSc],
+      ['Payment History',      `${pmtSc} / 100`,                                     pmtSc],
+      ['Industry Risk',        d.industry,                                            indSc],
+    ];
+
+    const ROW_H = 17;
+    dims.forEach(([label, val, score], i) => {
+      const yy = y + i * ROW_H;
+      if (i % 2 === 0) {
+        doc.setFillColor(246, 248, 252);
+        doc.rect(ML, yy - ROW_H + 5, CW, ROW_H, 'F');
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(20, 30, 50);
+      doc.text(label, ML + 4, yy);
+
+      doc.setTextColor(100, 116, 139);
+      doc.text(String(val), ML + 194, yy);
+
+      // Mini bar
+      const BAR_W = 70;
+      const BAR_H = 3.5;
+      const bx    = PW - MR - 4 - BAR_W - 28;
+      const by    = yy - 8;
+      doc.setFillColor(220, 228, 240);
+      doc.roundedRect(bx, by, BAR_W, BAR_H, 1.5, 1.5, 'F');
+      const fc = score >= 70 ? [16,185,129] : score >= 45 ? [245,158,11] : [239,68,68];
+      doc.setFillColor(...fc);
+      doc.roundedRect(bx, by, Math.max(2, BAR_W * score / 100), BAR_H, 1.5, 1.5, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(20, 30, 50);
+      doc.text(String(score), PW - MR - 4, yy, { align: 'right' });
+    });
+
+    y += dims.length * ROW_H + 4;
+    hr(y);
+    y += 12;
+
+    // Overall score total row
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Overall Score', ML + 4, y);
+    doc.text(`${d.overall_score} / 100`, PW - MR - 4, y, { align: 'right' });
+    y += 20;
+
+    // ── Risk Flags ────────────────────────────────────────────────
+    if (d.flags && d.flags.length > 0) {
+      hr(y);
+      y += 14;
+      y = sectionHead('RISK FLAGS', y);
+
+      d.flags.forEach(flag => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(180, 40, 40);
+        doc.text('[!]', ML + 2, y);
+        doc.setTextColor(30, 40, 60);
+        doc.text(flag, ML + 20, y);
+        y += 13;
+      });
+      y += 6;
+    }
+
+    // ── Analyst Reasoning ─────────────────────────────────────────
+    hr(y);
+    y += 14;
+    y = sectionHead('ANALYST REASONING', y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(30, 45, 65);
+    const lines = doc.splitTextToSize(d.reasoning, CW - 8);
+    lines.forEach(line => {
+      doc.text(line, ML + 4, y);
+      y += 13;
+    });
+    y += 8;
+
+    // ── Human Review ──────────────────────────────────────────────
+    if (d.requires_human_review) {
+      hr(y, [253, 230, 138], 0.75);
+      y += 14;
+
+      const reviewLines = [];
+      if (d.overall_score < 45)
+        reviewLines.push(`Overall score ${d.overall_score}/100 is below the 45-point review threshold.`);
+      if (d.credit_limit_recommended > 250_000)
+        reviewLines.push(`Recommended credit limit ${fmtUSD(d.credit_limit_recommended)} exceeds the $250,000 auto-approval ceiling.`);
+
+      const reviewBoxH = 18 + reviewLines.length * 13 + 10;
+      doc.setFillColor(255, 251, 235);
+      doc.setDrawColor(253, 200, 80);
+      doc.setLineWidth(0.75);
+      doc.roundedRect(ML, y, CW, reviewBoxH, 3, 3, 'FD');
+
+      y += 13;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(120, 60, 0);
+      doc.text('⚠ HUMAN REVIEW REQUIRED', ML + 12, y);
+      y += 13;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      reviewLines.forEach(line => {
+        doc.setTextColor(140, 80, 10);
+        doc.text(line, ML + 12, y);
+        y += 13;
+      });
+      y += 10;
+    }
+
+    // ── Footer ────────────────────────────────────────────────────
+    const FY = 820;
+    hr(FY, [200, 210, 225], 0.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(140, 155, 175);
+    doc.text('Prepared by OceanX AI Underwriting Agent', ML, FY + 13);
+    doc.text('Confidential — for internal use only', PW - MR, FY + 13, { align: 'right' });
+
+    const fname = `OceanX-${d.company_name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(fname);
   }
 </script>
 </body>
