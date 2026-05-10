@@ -7,7 +7,7 @@ from rich.text import Text
 
 from agent import UnderwritingAgent
 from models import CustomerApplication
-from report import print_report
+from report import print_human_checkpoint, print_report
 
 console = Console()
 
@@ -51,6 +51,7 @@ _DEMO_PROFILES: list[tuple[str, str, CustomerApplication]] = [
 async def _assess(agent: UnderwritingAgent, application: CustomerApplication) -> None:
     with console.status("[dim]Calling APIs and running credit analysis…[/dim]", spinner="dots"):
         report = await agent.underwrite(application)
+    print_human_checkpoint(report)
     print_report(report)
 
 

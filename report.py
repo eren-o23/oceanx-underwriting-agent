@@ -126,3 +126,47 @@ def print_report(report: UnderwritingReport) -> None:
     # ── Analyst reasoning ────────────────────────────────────────────────────
     console.print(Rule("Analyst Reasoning", style="dim"))
     console.print(f"\n  {report.reasoning}\n")
+
+
+def print_human_checkpoint(report: UnderwritingReport) -> None:
+    """Print a human-review warning panel when the report exceeds risk thresholds.
+
+    Triggers when overall_score < 45 OR credit_limit_recommended > $250,000.
+    Does nothing if neither condition is met.
+    """
+    rs = report.risk_score
+    reasons: list[Text] = []
+
+    if rs.overall_score < 45:
+        line = Text()
+        line.append("  • Low overall score: ", style="yellow")
+        line.append(f"{rs.overall_score} / 100", style="bold yellow")
+        line.append("  (threshold: 45)", style="dim")
+        reasons.append(line)
+
+    if rs.credit_limit_recommended > 250_000:
+        line = Text()
+        line.append("  • High credit limit recommended: ", style="yellow")
+        line.append(f"${rs.credit_limit_recommended:,.0f}", style="bold yellow")
+        line.append("  (threshold: $250,000)", style="dim")
+        reasons.append(line)
+
+    if not reasons:
+        return
+
+    body = Text()
+    body.append("Flagged for the following reason(s):\n\n", style="dim")
+    for reason in reasons:
+        body.append_text(reason)
+        body.append("\n")
+    body.append("\nAgent has paused. Awaiting human approval before proceeding.", style="bold white")
+
+    console.print(
+        Panel(
+            body,
+            title="[bold yellow]⚠️  HUMAN REVIEW REQUIRED[/bold yellow]",
+            border_style="yellow",
+            padding=(1, 3),
+        )
+    )
+    console.print()

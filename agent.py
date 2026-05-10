@@ -1,9 +1,11 @@
 import asyncio
 import json
+import os
+import sys
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
-from pydantic import BaseModel, Field
+from openai import APITimeoutError, AsyncOpenAI
+from pydantic import BaseModel, Field, ValidationError
 
 load_dotenv()
 
@@ -108,6 +110,11 @@ class UnderwritingAgent:
     """AI underwriting agent powered by GPT-4o."""
 
     def __init__(self) -> None:
+        if not os.getenv("OPENAI_API_KEY"):
+            sys.exit(
+                "Error: OPENAI_API_KEY is not set.\n"
+                "Add it to your .env file:  OPENAI_API_KEY=sk-..."
+            )
         self._client = AsyncOpenAI()
 
     async def underwrite(self, application: CustomerApplication) -> UnderwritingReport:
@@ -126,17 +133,37 @@ class UnderwritingAgent:
             bank_balance=xero_data["bank_balance_usd"],
         )
 
-        response = await self._client.beta.chat.completions.parse(
-            model=_MODEL,
-            max_tokens=1024,
-            messages=[
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": _build_prompt(application, apollo_data, xero_data, credit_data)},
-            ],
-            response_format=_CreditAnalysis,
-        )
+        try:
+            response = await self._client.beta.chat.completions.parse(
+                model=_MODEL,
+                max_tokens=1024,
+                messages=[
+                    {"role": "system", "content": _SYSTEM},
+                    {"role": "user", "content": _build_prompt(application, apollo_data, xero_data, credit_data)},
+                ],
+                response_format=_CreditAnalysis,
+            )
+        except APITimeoutError:
+            sys.exit(
+                "Error: The OpenAI API request timed out.\n"
+                "Check your network connection and try again."
+            )
 
-        analysis: _CreditAnalysis = response.choices[0].message.parsed
+        try:
+            analysis: _CreditAnalysis = response.choices[0].message.parsed
+        except ValidationError:
+            raw = response.choices[0].message.content
+            sys.exit(
+                f"Error: OpenAI returned a response that could not be parsed into the expected schema.\n"
+                f"Raw content: {raw!r}"
+            )
+
+        if analysis is None:
+            raw = response.choices[0].message.content
+            sys.exit(
+                f"Error: OpenAI returned a response that could not be parsed into the expected schema.\n"
+                f"Raw content: {raw!r}"
+            )
 
         return UnderwritingReport(
             application=application,
