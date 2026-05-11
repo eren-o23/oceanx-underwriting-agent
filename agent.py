@@ -9,7 +9,15 @@ from pydantic import BaseModel, Field, ValidationError
 
 load_dotenv()
 
-from mock_apis import fetch_apollo_data, fetch_credit_bureau, fetch_xero_financials
+from hubspot_api import create_hubspot_company
+from mock_apis import (
+    fetch_apollo_data,
+    fetch_credit_bureau,
+    fetch_hubspot_lead,
+    fetch_xero_financials,
+    simulate_gocardless_mandate,
+    simulate_wise_payment_request,
+)
 from models import (
     CustomerApplication,
     Decision,
@@ -110,6 +118,7 @@ class _CreditAnalysis(BaseModel):
 
 def _build_prompt(
     application: CustomerApplication,
+    hubspot: dict,
     apollo: dict,
     xero: dict,
     credit: dict,
@@ -117,6 +126,7 @@ def _build_prompt(
     return (
         "Assess the following credit application. All monetary figures are in USD.\n\n"
         f"## Customer application\n{json.dumps(application.model_dump(), indent=2)}\n\n"
+        f"## CRM record (HubSpot)\n{json.dumps(hubspot, indent=2)}\n\n"
         f"## Company enrichment (Apollo)\n{json.dumps(apollo, indent=2)}\n\n"
         f"## Financial statements (Xero)\n{json.dumps(xero, indent=2)}\n\n"
         f"## Credit bureau report\n{json.dumps(credit, indent=2)}\n\n"
@@ -137,10 +147,11 @@ class UnderwritingAgent:
 
     async def underwrite(self, application: CustomerApplication) -> UnderwritingReport:
         """Run a full underwriting assessment for the given application."""
-        apollo_data, xero_data, credit_data = await asyncio.gather(
+        apollo_data, xero_data, credit_data, hubspot_data = await asyncio.gather(
             fetch_apollo_data(application.name),
             fetch_xero_financials(application.name),
             fetch_credit_bureau(application.name),
+            fetch_hubspot_lead(application.name),
         )
 
         raw_fico = credit_data["payment_history_score"]
@@ -157,7 +168,7 @@ class UnderwritingAgent:
                 max_tokens=1024,
                 messages=[
                     {"role": "system", "content": _SYSTEM},
-                    {"role": "user", "content": _build_prompt(application, apollo_data, xero_data, credit_data)},
+                    {"role": "user", "content": _build_prompt(application, hubspot_data, apollo_data, xero_data, credit_data)},
                 ],
                 response_format=_CreditAnalysis,
             )
@@ -183,6 +194,30 @@ class UnderwritingAgent:
                 f"Raw content: {raw!r}"
             )
 
+        gocardless_mandate = None
+        wise_payment_request = None
+
+        hs_task = create_hubspot_company(
+            name=application.name,
+            industry=application.industry,
+            annual_revenue=application.annual_revenue,
+            country=application.country,
+            decision=analysis.decision.value,
+            credit_limit=analysis.credit_limit_recommended,
+            risk_rating=analysis.risk_rating.value,
+            overall_score=analysis.overall_score,
+            reasoning=analysis.reasoning,
+        )
+
+        if analysis.decision != Decision.DECLINED and analysis.credit_limit_recommended > 0:
+            hubspot_created, gocardless_mandate, wise_payment_request = await asyncio.gather(
+                hs_task,
+                simulate_gocardless_mandate(application.name, analysis.credit_limit_recommended),
+                simulate_wise_payment_request(application.name, analysis.credit_limit_recommended),
+            )
+        else:
+            hubspot_created = await hs_task
+
         return UnderwritingReport(
             application=application,
             financial_data=financial_data,
@@ -194,4 +229,8 @@ class UnderwritingAgent:
             ),
             reasoning=analysis.reasoning,
             decision=analysis.decision,
+            hubspot_lead=hubspot_data,
+            gocardless_mandate=gocardless_mandate,
+            wise_payment_request=wise_payment_request,
+            hubspot_created=hubspot_created,
         )

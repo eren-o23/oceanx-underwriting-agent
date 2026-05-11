@@ -74,6 +74,11 @@ class UnderwriteResponse(BaseModel):
     reasoning: str
     decision: str
     requires_human_review: bool
+    hubspot_lead: dict | None = None
+    gocardless_mandate: dict | None = None
+    wise_payment_request: dict | None = None
+    hubspot_created: dict | None = None
+    hubspot_url: str | None = None
 
 
 def _to_response(report: UnderwritingReport) -> UnderwriteResponse:
@@ -96,6 +101,11 @@ def _to_response(report: UnderwritingReport) -> UnderwriteResponse:
         reasoning=report.reasoning,
         decision=report.decision.value,
         requires_human_review=requires_review,
+        hubspot_lead=report.hubspot_lead,
+        gocardless_mandate=report.gocardless_mandate,
+        wise_payment_request=report.wise_payment_request,
+        hubspot_created=report.hubspot_created,
+        hubspot_url=(report.hubspot_created or {}).get("hubspot_url"),
     )
 
 

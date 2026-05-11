@@ -45,3 +45,7 @@ class UnderwritingReport(BaseModel):
     risk_score: RiskScore
     reasoning: str
     decision: Decision
+    hubspot_lead: dict | None = None
+    gocardless_mandate: dict | None = None
+    wise_payment_request: dict | None = None
+    hubspot_created: dict | None = None

@@ -100,6 +100,107 @@ async def fetch_credit_bureau(company_name: str) -> dict[str, Any]:
         "largest_credit_line_usd": round(rng.randint(10_000, 500_000), -3),
         "credit_utilisation_pct": round(rng.uniform(0.05, 0.90), 2),
         "court_judgements": rng.randint(0, min(defaults, 2)),
-        "bureau_report_date": "2026-05-10",
+        "bureau_report_date": "2026-05-11",
         "source": "credit_bureau_mock_v1",
+    }
+
+
+async def fetch_hubspot_lead(company_name: str) -> dict[str, Any]:
+    """Simulate HubSpot CRM record — lead source, meeting outcome, and sales rep notes."""
+    await asyncio.sleep(0.5)
+    rng = _seeded(company_name)
+
+    lead_sources = [
+        "Cold Email (Instantly)", "LinkedIn (Dripify)", "Apollo Outreach",
+        "Referral", "Trade Show", "Corporate Finance Broker",
+    ]
+    sales_reps = ["Sarah Chen", "Marcus Williams", "Priya Patel", "Tom Nguyen"]
+    meeting_dates = ["2026-04-22", "2026-04-28", "2026-05-01", "2026-05-05", "2026-05-08"]
+
+    sentiment_score = rng.randint(1, 10)
+
+    positive_notes = [
+        f"Strong demand for trade credit. {company_name} imports regularly from Asia — good volume.",
+        f"Founder has 10+ years in the industry. Clear growth plan with existing retail partners.",
+        f"Existing relationship with major retailers. Credit line would unlock their next buying cycle.",
+    ]
+    cautious_notes = [
+        f"Early-stage business. Limited trading history but founder is credible and well-connected.",
+        f"Some concerns raised around cash flow — team mentioned delayed receivables from key client.",
+    ]
+    critical_notes = [
+        f"High leverage flagged during meeting. Owner acknowledged difficulty servicing current debt.",
+    ]
+
+    if sentiment_score >= 7:
+        notes = rng.choice(positive_notes)
+        outcome = "approved_to_proceed"
+        sentiment = "positive"
+    elif sentiment_score >= 3:
+        notes = rng.choice(cautious_notes)
+        outcome = "approved_to_proceed"
+        sentiment = "cautious"
+    else:
+        notes = rng.choice(critical_notes)
+        outcome = "declined_at_meeting"
+        sentiment = "negative"
+
+    return {
+        "company_name": company_name,
+        "lead_source": rng.choice(lead_sources),
+        "assigned_rep": rng.choice(sales_reps),
+        "meeting_date": rng.choice(meeting_dates),
+        "meeting_outcome": outcome,
+        "human_checkpoint_1_completed": True,
+        "human_checkpoint_1_approved": outcome == "approved_to_proceed",
+        "sales_rep_sentiment": sentiment,
+        "sales_notes": notes,
+        "hubspot_deal_stage": "underwriting" if outcome == "approved_to_proceed" else "closed_lost",
+        "source": "hubspot_mock_v1",
+    }
+
+
+async def simulate_gocardless_mandate(company_name: str, credit_limit: float) -> dict[str, Any]:
+    """Simulate GoCardless direct debit mandate for an approved credit facility."""
+    await asyncio.sleep(0.3)
+    mandate_id = "MD" + hashlib.md5(company_name.encode()).hexdigest()[:8].upper()
+    weekly_payment = round(credit_limit / 12, 2)
+
+    return {
+        "mandate_id": mandate_id,
+        "company_name": company_name,
+        "status": "pending_customer_approval",
+        "credit_limit_usd": credit_limit,
+        "payment_schedule": "weekly",
+        "weekly_payment_usd": weekly_payment,
+        "repayment_weeks": 12,
+        "mandate_url": f"https://pay.gocardless.com/obauth/{mandate_id.lower()}",
+        "created_at": "2026-05-11T09:00:00Z",
+        "source": "gocardless_mock_v1",
+    }
+
+
+async def simulate_wise_payment_request(company_name: str, amount: float) -> dict[str, Any]:
+    """Simulate Wise supplier payment — marked awaiting human approval (second human checkpoint)."""
+    await asyncio.sleep(0.3)
+    rng = _seeded(company_name)
+
+    transfer_id = "TRF" + hashlib.md5((company_name + str(amount)).encode()).hexdigest()[:8].upper()
+    supplier_countries = ["China", "Taiwan", "South Korea", "Vietnam", "India", "Germany"]
+    currencies = ["USD", "EUR", "CNY", "SGD", "AUD"]
+
+    return {
+        "transfer_id": transfer_id,
+        "company_name": company_name,
+        "status": "awaiting_human_approval",
+        "human_checkpoint_2": "supplier_payment_approval",
+        "supplier_country": rng.choice(supplier_countries),
+        "amount_usd": amount,
+        "currency": rng.choice(currencies),
+        "wise_fee_usd": round(amount * 0.005, 2),
+        "estimated_arrival": "1–2 business days",
+        "exchange_rate_locked": True,
+        "approval_required_from": "operations_team",
+        "created_at": "2026-05-11T09:01:00Z",
+        "source": "wise_mock_v1",
     }
